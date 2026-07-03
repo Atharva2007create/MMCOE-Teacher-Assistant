@@ -13,6 +13,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# ════════════════════════════════════════════════════════════════════════════
+# THEME — dark / light, toggle rendered near the top of the page
+# ════════════════════════════════════════════════════════════════════════════
+if "dark_mode" not in st.session_state:
+    st.session_state["dark_mode"] = False
+DARK = st.session_state["dark_mode"]
+
 
 # DATA LAYER
 
@@ -112,28 +119,56 @@ def _on_day_change() -> None:
 # ════════════════════════════════════════════════════════════════════════════
 # STYLES
 # ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
+# THEME VARIABLES — generated per current theme, injected before the main stylesheet
+# ════════════════════════════════════════════════════════════════════════════
+_LIGHT_VARS = {
+    "maroon-950": "#260606",
+    "maroon-900": "#3D0A0A",
+    "maroon-800": "#5C0F0F",
+    "crimson-2":  "#A8161B",
+    "gold":       "#C9A24B",
+    "gold-2":     "#DEC07E",
+    "paper":      "#FBF9F7",
+    "paper-2":    "#F4EFEC",
+    "line":       "#E7DEDA",
+    "ink":        "#1A1110",
+    "ink-soft":   "#5A4642",
+    "ink-faint":  "#8C7975",
+    "white":      "#FFFFFF",
+}
+_DARK_VARS = {
+    "maroon-950": "#150404",
+    "maroon-900": "#280707",
+    "maroon-800": "#43100F",
+    "crimson-2":  "#E2565A",
+    "gold":       "#D8B366",
+    "gold-2":     "#EAD09A",
+    "paper":      "#141010",
+    "paper-2":    "#1D1716",
+    "line":       "#342625",
+    "ink":        "#F2E8E5",
+    "ink-soft":   "#CBB8B4",
+    "ink-faint":  "#9C8985",
+    "white":      "#211918",
+}
+_theme_vars = _DARK_VARS if DARK else _LIGHT_VARS
+_root_vars_css = "\n".join(f"    --{k}: {v};" for k, v in _theme_vars.items())
+
+st.markdown(f"""
+<style>
+:root {{
+{_root_vars_css}
+    --ease:        cubic-bezier(.16,1,.3,1);
+    --ease-smooth: cubic-bezier(.22,1,.36,1);
+    --ease-spring: cubic-bezier(.34,1.56,.64,1);
+}}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
-
-:root {
-    --maroon-950: #260606;
-    --maroon-900: #3D0A0A;
-    --maroon-800: #5C0F0F;
-    --crimson-2:  #A8161B;
-    --gold:       #C9A24B;
-    --gold-2:     #DEC07E;
-    --paper:      #FBF9F7;
-    --paper-2:    #F4EFEC;
-    --line:       #E7DEDA;
-    --ink:        #1A1110;
-    --ink-soft:   #5A4642;
-    --ink-faint:  #8C7975;
-    --white:      #FFFFFF;
-    --ease:       cubic-bezier(.16,1,.3,1);
-    --ease-smooth: cubic-bezier(.22,1,.36,1);
-    --ease-spring: cubic-bezier(.34,1.56,.64,1);
-}
 
 * { box-sizing: border-box; }
 
@@ -141,6 +176,7 @@ html, body, [class*="css"] {
     font-family: 'Inter', -apple-system, sans-serif;
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
 }
 
 .stApp {
@@ -148,6 +184,18 @@ html, body, [class*="css"] {
         radial-gradient(900px 400px at 100% 0%, rgba(142,18,18,0.05), transparent 55%),
         radial-gradient(700px 400px at 0% 0%, rgba(201,162,75,0.05), transparent 50%),
         var(--paper) !important;
+    transition: background-color 0.45s var(--ease-smooth);
+}
+
+/* Smooth cross-fade whenever the theme toggle switches variables,
+   instead of an abrupt color flash. */
+.hero, [data-testid="stVerticalBlockBorderWrapper"], .card, .sel-chip,
+.empty-box, .status-banner, .chip, .results-pill, .footer,
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+div[data-baseweb="popover"], div[data-baseweb="popover"] li {
+    transition-property: background-color, border-color, color, box-shadow;
+    transition-duration: 0.4s;
+    transition-timing-function: var(--ease-smooth);
 }
 
 #MainMenu, footer, header[data-testid="stHeader"] { visibility: hidden; height: 0; }
@@ -167,16 +215,52 @@ section.main, section.main > div, [data-testid="stVerticalBlock"],
 ::selection { background: rgba(168,22,27,0.15); }
 
 @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(14px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes fadeIn {
     from { opacity: 0; }
     to   { opacity: 1; }
 }
+@keyframes fadeSlideDown {
+    from { opacity: 0; margin-top: -6px; }
+    to   { opacity: 1; margin-top: 0; }
+}
 @keyframes chipIn {
-    from { opacity: 0; transform: scale(0.96); }
+    from { opacity: 0; transform: scale(0.94); }
     to   { opacity: 1; transform: scale(1); }
+}
+@keyframes themeSweep {
+    from { opacity: 0.55; }
+    to   { opacity: 1; }
+}
+
+/* ── Theme toggle bar (top of page) ── */
+div[data-testid="column"]:has(div[data-testid="stToggle"]) {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+div[data-testid="stToggle"] {
+    margin-top: 0.6rem;
+}
+div[data-testid="stToggle"] label {
+    gap: 0.5rem !important;
+}
+div[data-testid="stToggle"] p {
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    color: var(--ink-soft) !important;
+    transition: color 0.3s var(--ease-smooth) !important;
+}
+div[data-testid="stToggle"]:hover p {
+    color: var(--crimson-2) !important;
+}
+div[data-testid="stToggle"] [role="checkbox"] {
+    transition: background-color 0.35s var(--ease-smooth) !important;
+}
+div[data-testid="stToggle"] [role="checkbox"][aria-checked="true"] {
+    background-color: var(--crimson-2) !important;
 }
 
 /* ── Hero ── */
@@ -184,8 +268,11 @@ section.main, section.main > div, [data-testid="stVerticalBlock"],
     background: linear-gradient(160deg, var(--maroon-900) 0%, var(--maroon-950) 100%);
     margin: 0 -1.25rem 2rem -1.25rem;
     border-bottom: 1px solid rgba(201,162,75,0.25);
-    animation: fadeUp 0.5s var(--ease) both;
+    animation: fadeUp 0.65s var(--ease) both;
+    transition: background-color 0.45s var(--ease-smooth);
 }
+.hero-brand { animation: fadeIn 0.6s var(--ease-smooth) 0.08s both; }
+.hero-stats { animation: fadeIn 0.6s var(--ease-smooth) 0.16s both; }
 .hero-inner {
     padding: clamp(1.75rem, 5vw, 3rem) clamp(1.25rem, 4vw, 2.5rem);
     display: flex;
@@ -244,7 +331,7 @@ section.main, section.main > div, [data-testid="stVerticalBlock"],
     margin-bottom: 1.25rem !important;
     overflow: visible !important;
     transform: none !important;
-    animation: fadeIn 0.4s var(--ease-smooth) 0.05s both;
+    animation: fadeUp 0.55s var(--ease-smooth) 0.1s both;
 }
 .panel-head {
     display: flex; align-items: baseline; justify-content: space-between;
@@ -285,9 +372,10 @@ div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
     background: var(--white) !important;
     min-height: 46px !important;
     transition:
-        border-color 0.25s var(--ease-smooth),
-        box-shadow 0.25s var(--ease-smooth),
-        background-color 0.25s var(--ease-smooth) !important;
+        border-color 0.3s var(--ease-smooth),
+        box-shadow 0.3s var(--ease-smooth),
+        background-color 0.3s var(--ease-smooth),
+        transform 0.3s var(--ease-smooth) !important;
 }
 div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover {
     border-color: #D4B4B4 !important;
@@ -296,8 +384,9 @@ div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover {
 div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within > div,
 div[data-testid="stSelectbox"] div[data-baseweb="select"] > div[aria-expanded="true"] {
     border-color: var(--crimson-2) !important;
-    box-shadow: 0 0 0 3px rgba(168,22,27,0.12) !important;
+    box-shadow: 0 0 0 4px rgba(168,22,27,0.14) !important;
     background: var(--white) !important;
+    transform: translateY(-1px) !important;
 }
 div[data-testid="stSelectbox"] div[data-baseweb="select"].is-selected > div {
     border-color: #E8C4C4 !important;
@@ -351,7 +440,7 @@ div[data-baseweb="popover"] {
     border-radius: 12px !important;
     border: 1px solid var(--line) !important;
     box-shadow: 0 12px 36px -10px rgba(43,7,7,0.28) !important;
-    animation: fadeIn 0.15s var(--ease-smooth) both !important;
+    animation: fadeSlideDown 0.2s var(--ease-smooth) both !important;
 }
 div[data-baseweb="popover"] ul[role="listbox"] {
     max-height: min(320px, 50vh) !important;
@@ -386,6 +475,8 @@ div[data-baseweb="popover"] li[aria-selected="true"] div {
 /* ── Search button ── */
 div[data-testid="stButton"] > button[kind="primary"] {
     background: linear-gradient(150deg, var(--crimson-2), var(--maroon-800)) !important;
+    background-size: 160% 160% !important;
+    background-position: 0% 50% !important;
     color: #FFF5EE !important;
     border: none !important;
     border-radius: 12px !important;
@@ -395,15 +486,17 @@ div[data-testid="stButton"] > button[kind="primary"] {
     height: 46px !important;
     width: 100% !important;
     transition:
-        transform 0.28s var(--ease-smooth),
-        box-shadow 0.28s var(--ease-smooth),
-        filter 0.28s var(--ease-smooth) !important;
+        transform 0.32s var(--ease-smooth),
+        box-shadow 0.32s var(--ease-smooth),
+        filter 0.32s var(--ease-smooth),
+        background-position 0.5s var(--ease-smooth) !important;
     box-shadow: 0 8px 20px -8px rgba(142,18,18,0.55) !important;
 }
 div[data-testid="stButton"] > button[kind="primary"]:hover {
     transform: translateY(-2px) !important;
-    filter: brightness(1.05) !important;
-    box-shadow: 0 14px 28px -8px rgba(142,18,18,0.62) !important;
+    filter: brightness(1.06) !important;
+    background-position: 100% 50% !important;
+    box-shadow: 0 16px 32px -8px rgba(142,18,18,0.65) !important;
 }
 div[data-testid="stButton"] > button[kind="primary"]:active {
     transform: translateY(0) scale(0.98) !important;
@@ -476,10 +569,11 @@ div[data-testid="stButton"] > button[kind="primary"]:active {
     padding: 1.25rem 1.5rem; margin-bottom: 0.85rem;
     box-shadow: 0 8px 24px -18px rgba(43,7,7,0.3);
     transition:
-        transform 0.32s var(--ease-smooth),
-        box-shadow 0.32s var(--ease-smooth),
-        border-color 0.32s var(--ease-smooth);
-    animation: fadeUp 0.45s var(--ease-smooth) both;
+        transform 0.35s var(--ease-smooth),
+        box-shadow 0.35s var(--ease-smooth),
+        border-color 0.35s var(--ease-smooth),
+        background-color 0.4s var(--ease-smooth);
+    animation: fadeUp 0.5s var(--ease-smooth) both;
 }
 .card:nth-of-type(1) { animation-delay: 0.04s; }
 .card:nth-of-type(2) { animation-delay: 0.1s; }
@@ -487,8 +581,8 @@ div[data-testid="stButton"] > button[kind="primary"]:active {
 .card:nth-of-type(4) { animation-delay: 0.22s; }
 .card:nth-of-type(n+5) { animation-delay: 0.28s; }
 .card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 16px 36px -14px rgba(43,7,7,0.38);
+    transform: translateY(-4px) scale(1.006);
+    box-shadow: 0 18px 40px -14px rgba(43,7,7,0.4);
     border-color: #E8D5D5;
 }
 .card::before {
@@ -584,6 +678,40 @@ div[data-testid="stAlert"] { border-radius: 12px !important; }
 </style>
 """, unsafe_allow_html=True)
 
+if DARK:
+    st.markdown("""
+    <style>
+    /* Dark-mode touch-ups for the handful of badges/pills that use fixed
+       light-pastel colors (kept vivid enough to read, tuned for a dark card). */
+    .chip-theory    { background: rgba(226,86,90,0.16)  !important; color: #FF9FA2 !important; }
+    .chip-tutorial  { background: rgba(216,179,102,0.16) !important; color: #E8C07E !important; }
+    .chip-lab       { background: rgba(90,140,240,0.18)  !important; color: #9DBBFF !important; }
+    .chip-practical { background: rgba(60,180,110,0.18)  !important; color: #86E0AA !important; }
+    .chip-extra     { background: rgba(150,110,230,0.18) !important; color: #C7AEF5 !important; }
+
+    .field-label.filled { color: #6FDB9A !important; }
+
+    .sel-chip.active {
+        background: rgba(226,86,90,0.14) !important;
+        border-color: rgba(226,86,90,0.4) !important;
+    }
+    div[data-baseweb="popover"] li:hover,
+    div[data-baseweb="popover"] li[aria-selected="true"] {
+        background: rgba(226,86,90,0.16) !important;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"].is-selected > div {
+        border-color: rgba(226,86,90,0.35) !important;
+        background: rgba(226,86,90,0.06) !important;
+    }
+    .status-banner {
+        background: rgba(226,86,90,0.12) !important;
+        border-color: rgba(226,86,90,0.35) !important;
+    }
+    .card:hover { border-color: rgba(226,86,90,0.35) !important; }
+    .empty-box { border-color: var(--line) !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.components.v1.html("""
 <script>
 (function () {
@@ -641,6 +769,18 @@ st.components.v1.html("""
 })();
 </script>
 """, height=0)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# THEME TOGGLE — top of page, right-aligned
+# ════════════════════════════════════════════════════════════════════════════
+_top_l, _top_r = st.columns([8, 1.4])
+with _top_r:
+    st.toggle(
+        "🌙 Dark mode",
+        key="dark_mode",
+        help="Switch between light and dark theme",
+    )
 
 
 # ════════════════════════════════════════════════════════════════════════════
