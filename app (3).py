@@ -13,6 +13,17 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# ════════════════════════════════════════════════════════════════════════════
+# THEME — dark / light, toggle rendered near the top of the page
+# ════════════════════════════════════════════════════════════════════════════
+if "dark_mode" not in st.session_state:
+    st.session_state["dark_mode"] = False
+if "_prev_dark_mode" not in st.session_state:
+    st.session_state["_prev_dark_mode"] = st.session_state["dark_mode"]
+DARK = st.session_state["dark_mode"]
+THEME_JUST_CHANGED = st.session_state["_prev_dark_mode"] != DARK
+st.session_state["_prev_dark_mode"] = DARK
+
 
 # DATA LAYER
 
@@ -112,28 +123,94 @@ def _on_day_change() -> None:
 # ════════════════════════════════════════════════════════════════════════════
 # STYLES
 # ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
+# THEME VARIABLES — generated per current theme, injected before the main stylesheet
+# ════════════════════════════════════════════════════════════════════════════
+_LIGHT_VARS = {
+    "maroon-950": "#260606",
+    "maroon-900": "#3D0A0A",
+    "maroon-800": "#5C0F0F",
+    "crimson-2":  "#A8161B",
+    "gold":       "#C9A24B",
+    "gold-2":     "#DEC07E",
+    "paper":      "#FBF9F7",
+    "paper-2":    "#F4EFEC",
+    "line":       "#E7DEDA",
+    "ink":        "#1A1110",
+    "ink-soft":   "#5A4642",
+    "ink-faint":  "#8C7975",
+    "white":      "#FFFFFF",
+    # Heading text — distinct from maroon-900 (which also serves as a dark
+    # background shade for the hero). Headings need their own token so they
+    # can flip to a light color in dark mode instead of staying near-black.
+    "heading":        "#3D0A0A",
+    # Solid color fills that always carry light text on top (buttons,
+    # pills). Kept saturated-but-dark in both themes for AA contrast.
+    "accent-solid":   "#A8161B",
+    "banner-bg":      "#FFF4F4",
+    "banner-border":  "#F0C7C7",
+    "popover-hover":  "#FCEEEE",
+    "field-filled":   "#1C7740",
+    "sel-active-bg":     "#FFF0F0",
+    "sel-active-border": "#E8A8A8",
+    "card-hover-border": "#E8D5D5",
+    "chip-theory-bg":    "#FCEEEE",
+    "chip-tutorial-bg":  "#FBF1E2", "chip-tutorial-fg": "#8E5C12",
+    "chip-lab-bg":       "#EAF0FD", "chip-lab-fg":      "#1C3FA8",
+    "chip-practical-bg": "#E9F8EE", "chip-practical-fg": "#1C7740",
+    "chip-extra-bg":     "#F2ECFB", "chip-extra-fg":    "#5A35A8",
+}
+_DARK_VARS = {
+    "maroon-950": "#150404",
+    "maroon-900": "#280707",
+    "maroon-800": "#43100F",
+    "crimson-2":  "#E2565A",
+    "gold":       "#D8B366",
+    "gold-2":     "#EAD09A",
+    "paper":      "#141010",
+    "paper-2":    "#1D1716",
+    "line":       "#342625",
+    "ink":        "#F2E8E5",
+    "ink-soft":   "#CBB8B4",
+    "ink-faint":  "#9C8985",
+    "white":      "#211918",
+    # Warm gold reads clearly against near-black paper, keeping headings
+    # legible instead of the near-invisible dark maroon they'd inherit.
+    "heading":        "#EAD09A",
+    # A deeper red than crimson-2's dark value, so white button/pill text
+    # keeps AA contrast even though crimson-2 itself is brightened for
+    # dark-mode legibility elsewhere.
+    "accent-solid":   "#8E2226",
+    "banner-bg":      "rgba(226,86,90,0.14)",
+    "banner-border":  "rgba(226,86,90,0.38)",
+    "popover-hover":  "rgba(226,86,90,0.16)",
+    "field-filled":   "#6FD79A",
+    "sel-active-bg":     "rgba(226,86,90,0.14)",
+    "sel-active-border": "rgba(226,86,90,0.4)",
+    "card-hover-border": "rgba(226,86,90,0.35)",
+    "chip-theory-bg":    "rgba(226,86,90,0.16)",
+    "chip-tutorial-bg":  "rgba(216,150,60,0.16)",  "chip-tutorial-fg": "#F0A857",
+    "chip-lab-bg":       "rgba(90,140,230,0.16)",  "chip-lab-fg":      "#82A9FF",
+    "chip-practical-bg": "rgba(70,180,110,0.16)",  "chip-practical-fg": "#6FD79A",
+    "chip-extra-bg":     "rgba(150,110,220,0.16)", "chip-extra-fg":    "#BB9FF2",
+}
+_theme_vars = _DARK_VARS if DARK else _LIGHT_VARS
+_root_vars_css = "\n".join(f"    --{k}: {v};" for k, v in _theme_vars.items())
+
+st.markdown(f"""
+<style>
+:root {{
+{_root_vars_css}
+    --ease:        cubic-bezier(.16,1,.3,1);
+    --ease-smooth: cubic-bezier(.22,1,.36,1);
+    --ease-spring: cubic-bezier(.34,1.56,.64,1);
+}}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
-
-:root {
-    --maroon-950: #260606;
-    --maroon-900: #3D0A0A;
-    --maroon-800: #5C0F0F;
-    --crimson-2:  #A8161B;
-    --gold:       #C9A24B;
-    --gold-2:     #DEC07E;
-    --paper:      #FBF9F7;
-    --paper-2:    #F4EFEC;
-    --line:       #E7DEDA;
-    --ink:        #1A1110;
-    --ink-soft:   #5A4642;
-    --ink-faint:  #8C7975;
-    --white:      #FFFFFF;
-    --ease:       cubic-bezier(.16,1,.3,1);
-    --ease-smooth: cubic-bezier(.22,1,.36,1);
-    --ease-spring: cubic-bezier(.34,1.56,.64,1);
-}
 
 * { box-sizing: border-box; }
 
@@ -141,6 +218,7 @@ html, body, [class*="css"] {
     font-family: 'Inter', -apple-system, sans-serif;
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
 }
 
 .stApp {
@@ -148,6 +226,21 @@ html, body, [class*="css"] {
         radial-gradient(900px 400px at 100% 0%, rgba(142,18,18,0.05), transparent 55%),
         radial-gradient(700px 400px at 0% 0%, rgba(201,162,75,0.05), transparent 50%),
         var(--paper) !important;
+    transition: background-color 0.45s var(--ease-smooth);
+}
+
+/* Smooth cross-fade whenever the theme toggle switches variables,
+   instead of an abrupt color flash. */
+.hero, [data-testid="stVerticalBlockBorderWrapper"], .card, .sel-chip,
+.empty-box, .status-banner, .chip, .results-pill, .footer,
+.panel-title, .results-title, .empty-title, .footer-line1, .footer-line2,
+.meta-value, .meta-label, .card-subject, .field-hint, .panel-kicker,
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+div[data-testid="stSelectbox"] div[data-baseweb="select"] svg,
+div[data-baseweb="popover"], div[data-baseweb="popover"] li {
+    transition-property: background-color, border-color, color, box-shadow, fill;
+    transition-duration: 0.45s;
+    transition-timing-function: var(--ease-smooth);
 }
 
 #MainMenu, footer, header[data-testid="stHeader"] { visibility: hidden; height: 0; }
@@ -167,16 +260,174 @@ section.main, section.main > div, [data-testid="stVerticalBlock"],
 ::selection { background: rgba(168,22,27,0.15); }
 
 @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(14px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes fadeIn {
     from { opacity: 0; }
     to   { opacity: 1; }
 }
+@keyframes fadeSlideDown {
+    from { opacity: 0; margin-top: -6px; }
+    to   { opacity: 1; margin-top: 0; }
+}
 @keyframes chipIn {
-    from { opacity: 0; transform: scale(0.96); }
+    from { opacity: 0; transform: scale(0.94); }
     to   { opacity: 1; transform: scale(1); }
+}
+@keyframes themeSweep {
+    from { opacity: 0.45; }
+    to   { opacity: 1; }
+}
+
+/* ── Theme toggle — large Sun / Moon switch, blunt rounded-rect shape ── */
+div[data-testid="column"]:has(div[data-testid="stToggle"]) {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding-top: 0.3rem;
+}
+div[data-testid="stToggle"] {
+    margin-top: 0 !important;
+}
+
+/* The visible text label ("Dark mode") is kept for screen readers only —
+   the icons themselves communicate state, so we don't need it painted. */
+div[data-testid="stToggle"] p {
+    position: absolute !important;
+    width: 1px !important; height: 1px !important;
+    padding: 0 !important; margin: -1px !important;
+    overflow: hidden !important; clip: rect(0,0,0,0) !important;
+    white-space: nowrap !important; border: 0 !important;
+}
+
+div[data-testid="stToggle"] label {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    gap: 0 !important;
+    transition: transform 0.25s var(--ease-spring);
+}
+div[data-testid="stToggle"] label:hover {
+    transform: scale(1.045);
+}
+div[data-testid="stToggle"] label:active {
+    transform: scale(0.965);
+}
+
+/* Sun — fixed at the left end, bright and glowing while in light mode */
+div[data-testid="stToggle"] label::before {
+    content: "☀️";
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%) scale(1.12) rotate(0deg);
+    font-size: 19px;
+    line-height: 1;
+    z-index: 1;
+    opacity: 1;
+    filter: drop-shadow(0 0 5px rgba(255,183,77,0.85));
+    transition:
+        opacity 0.5s var(--ease-smooth),
+        transform 0.6s var(--ease-spring),
+        filter 0.5s var(--ease-smooth);
+    pointer-events: none;
+}
+
+/* Moon — fixed at the right end, bright and glowing while in dark mode */
+div[data-testid="stToggle"] label::after {
+    content: "🌙";
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%) scale(0.8) rotate(-35deg);
+    font-size: 17px;
+    line-height: 1;
+    z-index: 1;
+    opacity: 0.28;
+    transition:
+        opacity 0.5s var(--ease-smooth),
+        transform 0.6s var(--ease-spring);
+    pointer-events: none;
+}
+
+/* Swap emphasis when dark mode is on */
+div[data-testid="stToggle"] label:has([aria-checked="true"])::before {
+    opacity: 0.28;
+    transform: translateY(-50%) scale(0.8) rotate(30deg);
+    filter: none;
+}
+div[data-testid="stToggle"] label:has([aria-checked="true"])::after {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.16) rotate(0deg);
+    filter: drop-shadow(0 0 5px rgba(216,179,102,0.8));
+}
+
+/* The track itself — the real (native) control, fully restyled, sized up,
+   and reshaped to a blunt rounded-rectangle (not a full pill) for a more
+   deliberate, tactile, professional look */
+div[data-testid="stToggle"] [role="checkbox"] {
+    width: 88px !important;
+    height: 42px !important;
+    min-width: 88px !important;
+    border-radius: 16px !important;
+    background: linear-gradient(135deg, #FFE7B8 0%, #FFD37A 100%) !important;
+    border: 1.5px solid rgba(201,162,75,0.55) !important;
+    box-shadow:
+        inset 0 1px 3px rgba(255,255,255,0.6),
+        0 6px 18px -6px rgba(201,162,75,0.6) !important;
+    position: relative !important;
+    overflow: visible !important;
+    transition:
+        background 0.6s var(--ease-smooth),
+        border-color 0.6s var(--ease-smooth),
+        box-shadow 0.4s var(--ease-smooth),
+        filter 0.25s var(--ease-smooth) !important;
+}
+div[data-testid="stToggle"] [role="checkbox"][aria-checked="true"] {
+    background: linear-gradient(135deg, #2A3260 0%, #12162E 100%) !important;
+    border-color: rgba(216,179,102,0.5) !important;
+    box-shadow:
+        inset 0 1px 3px rgba(255,255,255,0.06),
+        0 6px 20px -6px rgba(10,6,20,0.75) !important;
+}
+div[data-testid="stToggle"] [role="checkbox"]:hover {
+    filter: brightness(1.08);
+}
+div[data-testid="stToggle"] [role="checkbox"]:focus-visible {
+    outline: 2px solid var(--crimson-2) !important;
+    outline-offset: 3px !important;
+}
+
+/* Hide BaseWeb's own internal knob markup — we draw our own below so the
+   look never depends on undocumented internal class names. */
+div[data-testid="stToggle"] [role="checkbox"] > * {
+    opacity: 0 !important;
+}
+
+/* Sliding knob — rounded-rect (echoes the track's blunt shape) that glides
+   and gently spins into place with a soft spring for a premium feel */
+div[data-testid="stToggle"] [role="checkbox"]::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 32px;
+    height: 32px;
+    border-radius: 11px;
+    background: radial-gradient(circle at 30% 30%, #FFFDF7, #FFEFC2);
+    box-shadow: 0 3px 8px rgba(120,80,10,0.4), 0 0 0 1px rgba(201,162,75,0.25);
+    transform: translateX(0) rotate(0deg);
+    transition:
+        transform 0.55s var(--ease-spring),
+        background 0.55s var(--ease-smooth),
+        box-shadow 0.55s var(--ease-smooth);
+}
+div[data-testid="stToggle"] [role="checkbox"][aria-checked="true"]::before {
+    transform: translateX(46px) rotate(225deg);
+    background: radial-gradient(circle at 30% 30%, #F4EFEC, #C9C2E8);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.55), 0 0 0 1px rgba(216,179,102,0.3);
 }
 
 /* ── Hero ── */
@@ -184,8 +435,11 @@ section.main, section.main > div, [data-testid="stVerticalBlock"],
     background: linear-gradient(160deg, var(--maroon-900) 0%, var(--maroon-950) 100%);
     margin: 0 -1.25rem 2rem -1.25rem;
     border-bottom: 1px solid rgba(201,162,75,0.25);
-    animation: fadeUp 0.5s var(--ease) both;
+    animation: fadeUp 0.65s var(--ease) both;
+    transition: background-color 0.45s var(--ease-smooth);
 }
+.hero-brand { animation: fadeIn 0.6s var(--ease-smooth) 0.08s both; }
+.hero-stats { animation: fadeIn 0.6s var(--ease-smooth) 0.16s both; }
 .hero-inner {
     padding: clamp(1.75rem, 5vw, 3rem) clamp(1.25rem, 4vw, 2.5rem);
     display: flex;
@@ -244,7 +498,7 @@ section.main, section.main > div, [data-testid="stVerticalBlock"],
     margin-bottom: 1.25rem !important;
     overflow: visible !important;
     transform: none !important;
-    animation: fadeIn 0.4s var(--ease-smooth) 0.05s both;
+    animation: fadeUp 0.55s var(--ease-smooth) 0.1s both;
 }
 .panel-head {
     display: flex; align-items: baseline; justify-content: space-between;
@@ -253,7 +507,8 @@ section.main, section.main > div, [data-testid="stVerticalBlock"],
 }
 .panel-title {
     font-family: 'Fraunces', serif; font-size: 1.25rem; font-weight: 600;
-    color: var(--maroon-900);
+    color: var(--heading);
+    transition: color 0.4s var(--ease-smooth);
 }
 .panel-kicker { font-size: 0.72rem; color: var(--ink-faint); font-weight: 500; }
 
@@ -262,7 +517,7 @@ section.main, section.main > div, [data-testid="stVerticalBlock"],
     text-transform: uppercase; color: var(--crimson-2); margin-bottom: 0.4rem;
     transition: color 0.3s var(--ease-smooth);
 }
-.field-label.filled { color: #1C7740; }
+.field-label.filled { color: var(--field-filled); }
 .field-label.muted { color: var(--ink-faint); }
 .field-hint {
     font-size: 0.72rem; color: var(--ink-faint); margin-top: 0.35rem; line-height: 1.4;
@@ -285,9 +540,10 @@ div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
     background: var(--white) !important;
     min-height: 46px !important;
     transition:
-        border-color 0.25s var(--ease-smooth),
-        box-shadow 0.25s var(--ease-smooth),
-        background-color 0.25s var(--ease-smooth) !important;
+        border-color 0.3s var(--ease-smooth),
+        box-shadow 0.3s var(--ease-smooth),
+        background-color 0.3s var(--ease-smooth),
+        transform 0.3s var(--ease-smooth) !important;
 }
 div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover {
     border-color: #D4B4B4 !important;
@@ -296,8 +552,9 @@ div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover {
 div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within > div,
 div[data-testid="stSelectbox"] div[data-baseweb="select"] > div[aria-expanded="true"] {
     border-color: var(--crimson-2) !important;
-    box-shadow: 0 0 0 3px rgba(168,22,27,0.12) !important;
+    box-shadow: 0 0 0 4px rgba(168,22,27,0.14) !important;
     background: var(--white) !important;
+    transform: translateY(-1px) !important;
 }
 div[data-testid="stSelectbox"] div[data-baseweb="select"].is-selected > div {
     border-color: #E8C4C4 !important;
@@ -325,8 +582,8 @@ div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div {
     white-space: nowrap !important;
 }
 div[data-testid="stSelectbox"] div[data-baseweb="select"] svg {
-    fill: var(--maroon-800) !important;
-    transition: transform 0.28s var(--ease-smooth) !important;
+    fill: var(--ink-soft) !important;
+    transition: transform 0.28s var(--ease-smooth), fill 0.35s var(--ease-smooth) !important;
 }
 div[data-testid="stSelectbox"] div[data-baseweb="select"] > div[aria-expanded="true"] svg {
     transform: rotate(180deg);
@@ -351,7 +608,7 @@ div[data-baseweb="popover"] {
     border-radius: 12px !important;
     border: 1px solid var(--line) !important;
     box-shadow: 0 12px 36px -10px rgba(43,7,7,0.28) !important;
-    animation: fadeIn 0.15s var(--ease-smooth) both !important;
+    animation: fadeSlideDown 0.2s var(--ease-smooth) both !important;
 }
 div[data-baseweb="popover"] ul[role="listbox"] {
     max-height: min(320px, 50vh) !important;
@@ -367,7 +624,7 @@ div[data-baseweb="popover"] li {
 }
 div[data-baseweb="popover"] li:hover,
 div[data-baseweb="popover"] li[aria-selected="true"] {
-    background: #FCEEEE !important;
+    background: var(--popover-hover) !important;
 }
 div[data-baseweb="popover"] li span,
 div[data-baseweb="popover"] li div,
@@ -385,7 +642,9 @@ div[data-baseweb="popover"] li[aria-selected="true"] div {
 
 /* ── Search button ── */
 div[data-testid="stButton"] > button[kind="primary"] {
-    background: linear-gradient(150deg, var(--crimson-2), var(--maroon-800)) !important;
+    background: linear-gradient(150deg, var(--accent-solid), var(--maroon-800)) !important;
+    background-size: 160% 160% !important;
+    background-position: 0% 50% !important;
     color: #FFF5EE !important;
     border: none !important;
     border-radius: 12px !important;
@@ -395,15 +654,17 @@ div[data-testid="stButton"] > button[kind="primary"] {
     height: 46px !important;
     width: 100% !important;
     transition:
-        transform 0.28s var(--ease-smooth),
-        box-shadow 0.28s var(--ease-smooth),
-        filter 0.28s var(--ease-smooth) !important;
+        transform 0.32s var(--ease-smooth),
+        box-shadow 0.32s var(--ease-smooth),
+        filter 0.32s var(--ease-smooth),
+        background-position 0.5s var(--ease-smooth) !important;
     box-shadow: 0 8px 20px -8px rgba(142,18,18,0.55) !important;
 }
 div[data-testid="stButton"] > button[kind="primary"]:hover {
     transform: translateY(-2px) !important;
-    filter: brightness(1.05) !important;
-    box-shadow: 0 14px 28px -8px rgba(142,18,18,0.62) !important;
+    filter: brightness(1.06) !important;
+    background-position: 100% 50% !important;
+    box-shadow: 0 16px 32px -8px rgba(142,18,18,0.65) !important;
 }
 div[data-testid="stButton"] > button[kind="primary"]:active {
     transform: translateY(0) scale(0.98) !important;
@@ -430,7 +691,7 @@ div[data-testid="stButton"] > button[kind="primary"]:active {
     max-width: 100%; word-break: break-word;
 }
 .sel-chip.active {
-    background: #FFF0F0; border-color: #E8A8A8;
+    background: var(--sel-active-bg); border-color: var(--sel-active-border);
     color: var(--ink) !important;
     box-shadow: 0 2px 8px -2px rgba(168,22,27,0.18);
     animation: chipIn 0.35s var(--ease-spring) both;
@@ -452,9 +713,10 @@ div[data-testid="stButton"] > button[kind="primary"]:active {
 /* ── Results ── */
 .status-banner {
     display: flex; align-items: flex-start; gap: 0.5rem;
-    background: #FFF4F4; border: 1px solid #F0C7C7; color: var(--crimson-2);
+    background: var(--banner-bg); border: 1px solid var(--banner-border); color: var(--crimson-2);
     border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.85rem;
     margin-bottom: 1.25rem;
+    transition: background-color 0.4s var(--ease-smooth), border-color 0.4s var(--ease-smooth);
 }
 .results-bar {
     display: flex; align-items: center; justify-content: space-between;
@@ -462,13 +724,15 @@ div[data-testid="stButton"] > button[kind="primary"]:active {
 }
 .results-title {
     font-family: 'Fraunces', serif; font-size: clamp(1.05rem, 3vw, 1.2rem);
-    font-weight: 600; color: var(--maroon-900);
+    font-weight: 600; color: var(--heading);
+    transition: color 0.4s var(--ease-smooth);
 }
 .results-title .who { color: var(--crimson-2); }
 .results-pill {
     font-size: 0.7rem; font-weight: 700;
-    color: #FFF5EE; background: var(--crimson-2);
+    color: #FFF5EE; background: var(--accent-solid);
     padding: 0.3rem 0.75rem; border-radius: 999px; white-space: nowrap;
+    transition: background-color 0.4s var(--ease-smooth);
 }
 
 .card {
@@ -476,10 +740,11 @@ div[data-testid="stButton"] > button[kind="primary"]:active {
     padding: 1.25rem 1.5rem; margin-bottom: 0.85rem;
     box-shadow: 0 8px 24px -18px rgba(43,7,7,0.3);
     transition:
-        transform 0.32s var(--ease-smooth),
-        box-shadow 0.32s var(--ease-smooth),
-        border-color 0.32s var(--ease-smooth);
-    animation: fadeUp 0.45s var(--ease-smooth) both;
+        transform 0.35s var(--ease-smooth),
+        box-shadow 0.35s var(--ease-smooth),
+        border-color 0.35s var(--ease-smooth),
+        background-color 0.4s var(--ease-smooth);
+    animation: fadeUp 0.5s var(--ease-smooth) both;
 }
 .card:nth-of-type(1) { animation-delay: 0.04s; }
 .card:nth-of-type(2) { animation-delay: 0.1s; }
@@ -487,9 +752,9 @@ div[data-testid="stButton"] > button[kind="primary"]:active {
 .card:nth-of-type(4) { animation-delay: 0.22s; }
 .card:nth-of-type(n+5) { animation-delay: 0.28s; }
 .card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 16px 36px -14px rgba(43,7,7,0.38);
-    border-color: #E8D5D5;
+    transform: translateY(-4px) scale(1.006);
+    box-shadow: 0 18px 40px -14px rgba(43,7,7,0.4);
+    border-color: var(--card-hover-border);
 }
 .card::before {
     content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
@@ -507,11 +772,11 @@ div[data-testid="stButton"] > button[kind="primary"]:active {
     font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
     padding: 0.28rem 0.65rem; border-radius: 999px;
 }
-.chip-theory    { background: #FCEEEE; color: var(--crimson-2); }
-.chip-tutorial  { background: #FBF1E2; color: #8E5C12; }
-.chip-lab       { background: #EAF0FD; color: #1C3FA8; }
-.chip-practical { background: #E9F8EE; color: #1C7740; }
-.chip-extra     { background: #F2ECFB; color: #5A35A8; }
+.chip-theory    { background: var(--chip-theory-bg);    color: var(--crimson-2); }
+.chip-tutorial  { background: var(--chip-tutorial-bg);  color: var(--chip-tutorial-fg); }
+.chip-lab       { background: var(--chip-lab-bg);       color: var(--chip-lab-fg); }
+.chip-practical { background: var(--chip-practical-bg); color: var(--chip-practical-fg); }
+.chip-extra     { background: var(--chip-extra-bg);     color: var(--chip-extra-fg); }
 .card-index { font-size: 0.65rem; color: var(--ink-faint); }
 .card-subject {
     font-family: 'Fraunces', serif;
@@ -537,13 +802,14 @@ div[data-testid="stButton"] > button[kind="primary"]:active {
 }
 .empty-title {
     font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 600;
-    color: var(--maroon-900); margin-bottom: 0.4rem;
+    color: var(--heading); margin-bottom: 0.4rem;
+    transition: color 0.4s var(--ease-smooth);
 }
 .empty-sub { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.6; max-width: 420px; margin: 0 auto; }
 
 .soft-divider { height: 1px; background: var(--line); margin: 2rem 0 1.25rem 0; }
 .footer { text-align: center; padding-bottom: 1rem; }
-.footer-line1 { font-size: 0.78rem; font-weight: 600; color: var(--maroon-900); }
+.footer-line1 { font-size: 0.78rem; font-weight: 600; color: var(--heading); transition: color 0.4s var(--ease-smooth); }
 .footer-line2 { font-size: 0.7rem; color: var(--ink-faint); margin-top: 0.3rem; line-height: 1.5; }
 
 div[data-testid="stAlert"] { border-radius: 12px !important; }
@@ -584,7 +850,50 @@ div[data-testid="stAlert"] { border-radius: 12px !important; }
 </style>
 """, unsafe_allow_html=True)
 
-st.components.v1.html("""
+if THEME_JUST_CHANGED:
+    st.markdown(
+        "<style>.stApp { animation: themeSweep 0.6s var(--ease-smooth) both; }</style>",
+        unsafe_allow_html=True,
+    )
+
+if DARK:
+    st.markdown("""
+    <style>
+    /* Dark-mode touch-ups for the handful of badges/pills that use fixed
+       light-pastel colors (kept vivid enough to read, tuned for a dark card). */
+    .chip-theory    { background: rgba(226,86,90,0.16)  !important; color: #FF9FA2 !important; }
+    .chip-tutorial  { background: rgba(216,179,102,0.16) !important; color: #E8C07E !important; }
+    .chip-lab       { background: rgba(90,140,240,0.18)  !important; color: #9DBBFF !important; }
+    .chip-practical { background: rgba(60,180,110,0.18)  !important; color: #86E0AA !important; }
+    .chip-extra     { background: rgba(150,110,230,0.18) !important; color: #C7AEF5 !important; }
+
+    .field-label.filled { color: #6FDB9A !important; }
+
+    .sel-chip.active {
+        background: rgba(226,86,90,0.14) !important;
+        border-color: rgba(226,86,90,0.4) !important;
+    }
+    div[data-baseweb="popover"] li:hover,
+    div[data-baseweb="popover"] li[aria-selected="true"] {
+        background: rgba(226,86,90,0.16) !important;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"].is-selected > div {
+        border-color: rgba(226,86,90,0.35) !important;
+        background: rgba(226,86,90,0.06) !important;
+    }
+    .status-banner {
+        background: rgba(226,86,90,0.12) !important;
+        border-color: rgba(226,86,90,0.35) !important;
+    }
+    .card:hover { border-color: rgba(226,86,90,0.35) !important; }
+    .empty-box { border-color: var(--line) !important; }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover {
+        border-color: rgba(226,86,90,0.4) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+_select_patch_js = """
 <script>
 (function () {
   try {
@@ -593,13 +902,14 @@ st.components.v1.html("""
     return; // cross-origin iframe — nothing below is safe to run
   }
   const PLACEHOLDERS = ["Select professor", "Select day", "Select time"];
-  const INK = "#1A1110";
-  const INK_SOFT = "#5A4642";
+  const INK = "__INK__";
+  const INK_SOFT = "__INK_SOFT__";
   let patchTimer = 0;
 
   // This only patches text color for legibility — it never touches
   // position/transform, so the popover's own native placement (which
-  // anchors it correctly under the field) is always left alone.
+  // anchors it correctly under the field) is always left alone. Colors
+  // are substituted from the live theme so this never fights dark mode.
   function patchSelectText() {
     doc.querySelectorAll('[data-testid="stSelectbox"] [data-baseweb="select"]').forEach(function (el) {
       const text = (el.textContent || "").trim();
@@ -640,7 +950,21 @@ st.components.v1.html("""
   });
 })();
 </script>
-""", height=0)
+""".replace("__INK__", _theme_vars["ink"]).replace("__INK_SOFT__", _theme_vars["ink-soft"])
+
+st.components.v1.html(_select_patch_js, height=0)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# THEME TOGGLE — top of page, right-aligned
+# ════════════════════════════════════════════════════════════════════════════
+_top_l, _top_r = st.columns([8, 1.4])
+with _top_r:
+    st.toggle(
+        "🌙 Dark mode",
+        key="dark_mode",
+        help="Switch between light and dark theme",
+    )
 
 
 # ════════════════════════════════════════════════════════════════════════════
