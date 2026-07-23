@@ -84,7 +84,27 @@ def _get_professor_schedule(prof: str) -> dict:
     if prof == PLACEHOLDER_PROF or prof not in all_professors:
         return {day: [] for day in DAY_ORDER}
     
+    # Check if there are any assignments for this day
     prof_data = df[df["professor"] == prof].copy()
+    
+    # Also include assignments from the session state
+    if "assignments" in st.session_state and st.session_state["assignments"]:
+        for assignment in st.session_state["assignments"]:
+            if assignment["professor"] == prof:
+                # Add this assignment to the data
+                prof_data = pd.concat([
+                    prof_data,
+                    pd.DataFrame([{
+                        "professor": assignment["professor"],
+                        "day": assignment["day"],
+                        "time_slot": assignment["time_slot"],
+                        "division": assignment["division"],
+                        "subject": assignment["subject"],
+                        "room": assignment["room"],
+                        "type": assignment["type"]
+                    }])
+                ], ignore_index=True)
+    
     schedule = {day: [] for day in DAY_ORDER}
     
     for day in DAY_ORDER:
@@ -611,6 +631,70 @@ div[data-baseweb="popover"] li[aria-selected="true"] div {
     word-break: break-word;
 }
 
+/* ── Assignment Section ── */
+.assignment-section {
+    margin-top: 1.75rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--paper-2);
+    animation: fadeIn 0.5s var(--ease-smooth) both;
+}
+.assignment-title {
+    font-family: 'Fraunces', serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--maroon-900);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.assignment-content {
+    background: #FFFBFB;
+    border: 1px solid #F0C7C7;
+    border-radius: 12px;
+    padding: 1.25rem;
+}
+.assignment-control {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+.assignment-dropdown {
+    flex: 1;
+    min-width: 200px;
+}
+.assignment-button {
+    padding: 0.65rem 1.25rem;
+    background: linear-gradient(150deg, var(--crimson-2), var(--maroon-800));
+    color: #FFF5EE;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-smooth);
+}
+.assignment-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(168, 22, 27, 0.3);
+}
+.assignment-button:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.assignment-confirmation {
+    background: #E9F8EE;
+    border: 1px solid #C7E8D8;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+    color: #1C7740;
+    font-size: 0.9rem;
+    animation: fadeIn 0.3s var(--ease-smooth) both;
+}
+
 .back-button {
     display: inline-flex;
     align-items: center;
@@ -686,6 +770,8 @@ div[data-testid="stAlert"] { border-radius: 12px !important; }
     .hero-brand { flex-direction: column; align-items: flex-start; }
     .panel-head { flex-direction: column; align-items: flex-start; }
     .brief-meta { flex-direction: column; gap: 0.5rem; }
+    .assignment-control { flex-direction: column; }
+    .assignment-dropdown { min-width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -800,6 +886,8 @@ if "prof_select" not in st.session_state:
     st.session_state["prof_select"] = PLACEHOLDER_PROF
 if "selected_session_index" not in st.session_state:
     st.session_state["selected_session_index"] = None
+if "assignments" not in st.session_state:
+    st.session_state["assignments"] = []
 
 
 # ════════════════════════════════════════════════════════════════
@@ -906,6 +994,82 @@ else:
               </div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # ════════════════════════════════════════════════════════════════
+            # ASSIGNMENT SECTION
+            # ════════════════════════════════════════════════════════════════
+            
+            # Check if already assigned
+            existing_assignment = None
+            for assignment in st.session_state["assignments"]:
+                if (assignment["day"] == day and 
+                    assignment["time_slot"] == session["time_slot"] and 
+                    assignment["division"] == session["division"] and
+                    assignment["subject"] == session["subject"]):
+                    existing_assignment = assignment
+                    break
+            
+            st.markdown("""
+            <div class="assignment-section">
+              <div class="assignment-title">
+                👨‍🏫 Assign Another Professor for This Lecture
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            with st.container():
+                col1, col2 = st.columns([2, 1], gap="small")
+                
+                with col1:
+                    st.markdown('<div class="field-label">Select Professor</div>', unsafe_allow_html=True)
+                    assigned_prof = st.selectbox(
+                        "Assign professor",
+                        options=all_professors,
+                        label_visibility="collapsed",
+                        key=f"assign_prof_{session_key}",
+                        index=None,
+                        placeholder="Choose a professor..."
+                    )
+                
+                with col2:
+                    st.markdown('<div class="field-label">&nbsp;</div>', unsafe_allow_html=True)
+                    if st.button("Assign", key=f"assign_btn_{session_key}", use_container_width=True):
+                        if assigned_prof:
+                            # Check if this exact assignment already exists
+                            assignment_exists = False
+                            for i, assignment in enumerate(st.session_state["assignments"]):
+                                if (assignment["day"] == day and 
+                                    assignment["time_slot"] == session["time_slot"] and 
+                                    assignment["division"] == session["division"] and
+                                    assignment["subject"] == session["subject"]):
+                                    # Update existing
+                                    st.session_state["assignments"][i]["professor"] = assigned_prof
+                                    assignment_exists = True
+                                    break
+                            
+                            if not assignment_exists:
+                                # Add new assignment
+                                st.session_state["assignments"].append({
+                                    "professor": assigned_prof,
+                                    "day": day,
+                                    "time_slot": session["time_slot"],
+                                    "division": session["division"],
+                                    "subject": session["subject"],
+                                    "room": session["room"],
+                                    "type": session["type"]
+                                })
+                            
+                            st.success(f"✅ {escape_html(assigned_prof)} has been assigned to this lecture for {escape_html(day)}!")
+                            st.rerun()
+            
+            # Show current assignment status
+            if existing_assignment:
+                st.markdown(f"""
+                <div class="assignment-confirmation">
+                  ✓ Currently assigned: <strong>{escape_html(existing_assignment['professor'])}</strong> on <strong>{escape_html(day)}</strong>
+                </div>
+                """, unsafe_allow_html=True)
+    
     else:
         # Display all days
         day_emojis = {
