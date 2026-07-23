@@ -693,6 +693,31 @@ div[data-baseweb="popover"] li[aria-selected="true"] div {
     color: #1C7740;
     font-size: 0.9rem;
     animation: fadeIn 0.3s var(--ease-smooth) both;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.remove-button {
+    padding: 0.5rem 1rem;
+    background: #E8A8A8;
+    color: #8B0000;
+    border: 1px solid #D4A8A8;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-smooth);
+    white-space: nowrap;
+}
+.remove-button:hover {
+    background: #D99090;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(168, 22, 27, 0.2);
+}
+.remove-button:active {
+    transform: translateY(0) scale(0.98);
 }
 
 .back-button {
@@ -772,6 +797,8 @@ div[data-testid="stAlert"] { border-radius: 12px !important; }
     .brief-meta { flex-direction: column; gap: 0.5rem; }
     .assignment-control { flex-direction: column; }
     .assignment-dropdown { min-width: 100%; }
+    .assignment-confirmation { flex-direction: column; }
+    .remove-button { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1062,13 +1089,27 @@ else:
                             st.success(f"✅ {escape_html(assigned_prof)} has been assigned to this lecture for {escape_html(day)}!")
                             st.rerun()
             
-            # Show current assignment status
+            # Show current assignment status with remove button
             if existing_assignment:
                 st.markdown(f"""
                 <div class="assignment-confirmation">
-                  ✓ Currently assigned: <strong>{escape_html(existing_assignment['professor'])}</strong> on <strong>{escape_html(day)}</strong>
+                  <div>✓ Currently assigned: <strong>{escape_html(existing_assignment['professor'])}</strong> on <strong>{escape_html(day)}</strong></div>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                # Remove assignment button
+                if st.button("🗑️ Remove Assignment", key=f"remove_btn_{session_key}", help="Remove the assigned professor from this lecture"):
+                    # Find and remove the assignment
+                    for i, assignment in enumerate(st.session_state["assignments"]):
+                        if (assignment["day"] == day and 
+                            assignment["time_slot"] == session["time_slot"] and 
+                            assignment["division"] == session["division"] and
+                            assignment["subject"] == session["subject"]):
+                            st.session_state["assignments"].pop(i)
+                            break
+                    
+                    st.warning(f"❌ Assignment removed! This lecture is no longer assigned to {escape_html(existing_assignment['professor'])}.")
+                    st.rerun()
     
     else:
         # Display all days
