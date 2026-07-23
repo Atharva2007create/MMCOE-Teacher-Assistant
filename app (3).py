@@ -3,9 +3,9 @@ import pandas as pd
 import os
 import re
 
-# ════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════
 # PAGE CONFIG
-# ════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════
 st.set_page_config(
     page_title="MMCOE Teacher Assistant",
     page_icon="🎓",
@@ -22,8 +22,6 @@ DAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 REQUIRED_COLS = ["professor", "day", "time_slot", "division", "subject", "room", "type"]
 
 PLACEHOLDER_PROF = "Select professor"
-PLACEHOLDER_DAY = "Select day"
-PLACEHOLDER_TIME = "Select time"
 
 
 def _time_sort_key(t: str):
@@ -81,37 +79,47 @@ def escape_html(text: str) -> str:
     )
 
 
-def _days_for_professor(prof: str) -> list[str]:
-    if prof == PLACEHOLDER_PROF:
-        return []
-    subset = df[df["professor"] == prof]
-    return [d for d in DAY_ORDER if d in subset["day"].unique()]
+def _get_professor_schedule(prof: str) -> dict:
+    """Returns schedule grouped by day for a professor"""
+    if prof == PLACEHOLDER_PROF or prof not in all_professors:
+        return {day: [] for day in DAY_ORDER}
+    
+    prof_data = df[df["professor"] == prof].copy()
+    schedule = {day: [] for day in DAY_ORDER}
+    
+    for day in DAY_ORDER:
+        day_sessions = prof_data[prof_data["day"] == day]
+        if not day_sessions.empty:
+            day_sessions = day_sessions.sort_values("time_slot", key=lambda x: x.apply(_time_sort_key))
+            schedule[day] = day_sessions.to_dict('records')
+    
+    return schedule
 
 
-def _times_for_professor_day(prof: str, day: str) -> list[str]:
-    if prof == PLACEHOLDER_PROF or day == PLACEHOLDER_DAY:
-        return []
-    subset = df[(df["professor"] == prof) & (df["day"] == day)]
-    return sorted(subset["time_slot"].unique().tolist(), key=_time_sort_key)
+def classify(ltype: str):
+    """Classify session type and return chip styling"""
+    TYPE_CHIP_MAP = {
+        "theory":    ("chip-theory",    "type-theory",    "Theory"),
+        "tutorial":  ("chip-tutorial",  "type-tutorial",  "Tutorial"),
+        "lab":       ("chip-lab",       "type-lab",       "Lab"),
+        "practical": ("chip-practical", "type-practical", "Practical"),
+    }
+    
+    t = (ltype or "").lower()
+    if "theory" in t:
+        return TYPE_CHIP_MAP["theory"]
+    if "tutorial" in t:
+        return TYPE_CHIP_MAP["tutorial"]
+    if "lab" in t:
+        return TYPE_CHIP_MAP["lab"]
+    if "practical" in t:
+        return TYPE_CHIP_MAP["practical"]
+    return ("chip-extra", "type-extra", ltype.title() if ltype else "Session")
 
 
-def _ensure_option(key: str, options: list[str], default: str) -> None:
-    if st.session_state.get(key) not in options:
-        st.session_state[key] = default
-
-
-def _on_professor_change() -> None:
-    st.session_state["day_select"] = PLACEHOLDER_DAY
-    st.session_state["time_select"] = PLACEHOLDER_TIME
-
-
-def _on_day_change() -> None:
-    st.session_state["time_select"] = PLACEHOLDER_TIME
-
-
-# ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════
 # STYLES
-# ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
@@ -383,168 +391,284 @@ div[data-baseweb="popover"] li[aria-selected="true"] div {
     -webkit-text-fill-color: var(--crimson-2) !important;
 }
 
-/* ── Search button ── */
-div[data-testid="stButton"] > button[kind="primary"] {
-    background: linear-gradient(150deg, var(--crimson-2), var(--maroon-800)) !important;
-    color: #FFF5EE !important;
-    border: none !important;
-    border-radius: 12px !important;
-    font-weight: 700 !important;
-    font-size: 0.88rem !important;
-    letter-spacing: 0.04em !important;
-    height: 46px !important;
-    width: 100% !important;
+/* ── Day Section ── */
+.day-section {
+    margin-bottom: 1.75rem;
+    animation: fadeIn 0.4s var(--ease-smooth) both;
+}
+.day-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid var(--line);
+}
+.day-emoji {
+    font-size: 1.5rem;
+}
+.day-title {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--maroon-900);
+    flex: 1;
+}
+.day-count {
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    font-weight: 600;
+    background: var(--paper-2);
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+}
+
+.no-schedule {
+    background: var(--white);
+    border: 1.5px dashed var(--line);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 0.9rem;
+}
+
+/* ── Brief Card (clickable) ── */
+.brief-card {
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
     transition:
         transform 0.28s var(--ease-smooth),
         box-shadow 0.28s var(--ease-smooth),
-        filter 0.28s var(--ease-smooth) !important;
-    box-shadow: 0 8px 20px -8px rgba(142,18,18,0.55) !important;
+        border-color 0.28s var(--ease-smooth);
+    animation: fadeUp 0.35s var(--ease-smooth) both;
+    position: relative;
+    overflow: hidden;
 }
-div[data-testid="stButton"] > button[kind="primary"]:hover {
-    transform: translateY(-2px) !important;
-    filter: brightness(1.05) !important;
-    box-shadow: 0 14px 28px -8px rgba(142,18,18,0.62) !important;
-}
-div[data-testid="stButton"] > button[kind="primary"]:active {
-    transform: translateY(0) scale(0.98) !important;
-    transition-duration: 0.12s !important;
-}
-
-/* ── Selection summary ── */
-.selection-track {
-    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
-    margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--paper-2);
-    animation: fadeIn 0.35s var(--ease-smooth) both;
-}
-.sel-chip {
-    display: inline-flex; align-items: center; gap: 0.35rem;
-    padding: 0.4rem 0.85rem; border-radius: 999px;
-    font-size: 0.8rem; font-weight: 600;
-    background: var(--paper-2); border: 1px solid var(--line); color: var(--ink-soft);
-    transition:
-        background-color 0.3s var(--ease-smooth),
-        border-color 0.3s var(--ease-smooth),
-        color 0.3s var(--ease-smooth),
-        transform 0.3s var(--ease-spring),
-        box-shadow 0.3s var(--ease-smooth);
-    max-width: 100%; word-break: break-word;
-}
-.sel-chip.active {
-    background: #FFF0F0; border-color: #E8A8A8;
-    color: var(--ink) !important;
-    box-shadow: 0 2px 8px -2px rgba(168,22,27,0.18);
-    animation: chipIn 0.35s var(--ease-spring) both;
-}
-.sel-chip.active .sel-val {
-    color: var(--crimson-2) !important;
-    font-weight: 700;
-}
-.sel-chip .sel-lab {
-    font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--ink-faint); font-weight: 700;
-}
-.sel-chip.active .sel-lab { color: var(--crimson-2); opacity: 0.75; }
-.sel-arrow {
-    color: var(--ink-faint); font-size: 0.8rem;
-    transition: transform 0.3s var(--ease-smooth), opacity 0.3s ease;
-}
-
-/* ── Results ── */
-.status-banner {
-    display: flex; align-items: flex-start; gap: 0.5rem;
-    background: #FFF4F4; border: 1px solid #F0C7C7; color: var(--crimson-2);
-    border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.85rem;
-    margin-bottom: 1.25rem;
-}
-.results-bar {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 0.75rem; flex-wrap: wrap; margin: 0.5rem 0 1rem 0;
-}
-.results-title {
-    font-family: 'Fraunces', serif; font-size: clamp(1.05rem, 3vw, 1.2rem);
-    font-weight: 600; color: var(--maroon-900);
-}
-.results-title .who { color: var(--crimson-2); }
-.results-pill {
-    font-size: 0.7rem; font-weight: 700;
-    color: #FFF5EE; background: var(--crimson-2);
-    padding: 0.3rem 0.75rem; border-radius: 999px; white-space: nowrap;
-}
-
-.card {
-    background: var(--white); border-radius: 16px; border: 1px solid var(--line);
-    padding: 1.25rem 1.5rem; margin-bottom: 0.85rem;
-    box-shadow: 0 8px 24px -18px rgba(43,7,7,0.3);
-    transition:
-        transform 0.32s var(--ease-smooth),
-        box-shadow 0.32s var(--ease-smooth),
-        border-color 0.32s var(--ease-smooth);
-    animation: fadeUp 0.45s var(--ease-smooth) both;
-}
-.card:nth-of-type(1) { animation-delay: 0.04s; }
-.card:nth-of-type(2) { animation-delay: 0.1s; }
-.card:nth-of-type(3) { animation-delay: 0.16s; }
-.card:nth-of-type(4) { animation-delay: 0.22s; }
-.card:nth-of-type(n+5) { animation-delay: 0.28s; }
-.card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 16px 36px -14px rgba(43,7,7,0.38);
+.brief-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -8px rgba(43,7,7,0.3);
     border-color: #E8D5D5;
 }
-.card::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
-    border-radius: 16px 0 0 16px;
+.brief-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    border-radius: 12px 0 0 12px;
 }
-.card { position: relative; overflow: hidden; }
-.card.type-theory::before    { background: var(--crimson-2); }
-.card.type-tutorial::before  { background: #C9842E; }
-.card.type-lab::before       { background: #2E5DC9; }
-.card.type-practical::before { background: #2E9956; }
-.card.type-extra::before     { background: #7A4FC9; }
+.brief-card.type-theory::before    { background: var(--crimson-2); }
+.brief-card.type-tutorial::before  { background: #C9842E; }
+.brief-card.type-lab::before       { background: #2E5DC9; }
+.brief-card.type-practical::before { background: #2E9956; }
+.brief-card.type-extra::before     { background: #7A4FC9; }
 
-.card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; gap: 0.5rem; flex-wrap: wrap; }
-.chip {
-    font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
-    padding: 0.28rem 0.65rem; border-radius: 999px;
+.brief-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.65rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
 }
-.chip-theory    { background: #FCEEEE; color: var(--crimson-2); }
-.chip-tutorial  { background: #FBF1E2; color: #8E5C12; }
-.chip-lab       { background: #EAF0FD; color: #1C3FA8; }
-.chip-practical { background: #E9F8EE; color: #1C7740; }
-.chip-extra     { background: #F2ECFB; color: #5A35A8; }
-.card-index { font-size: 0.65rem; color: var(--ink-faint); }
-.card-subject {
+.brief-chip {
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+}
+.brief-chip.chip-theory    { background: #FCEEEE; color: var(--crimson-2); }
+.brief-chip.chip-tutorial  { background: #FBF1E2; color: #8E5C12; }
+.brief-chip.chip-lab       { background: #EAF0FD; color: #1C3FA8; }
+.brief-chip.chip-practical { background: #E9F8EE; color: #1C7740; }
+.brief-chip.chip-extra     { background: #F2ECFB; color: #5A35A8; }
+
+.brief-subject {
     font-family: 'Fraunces', serif;
-    font-size: clamp(1rem, 3vw, 1.15rem); font-weight: 600;
-    color: var(--ink); line-height: 1.35; margin-bottom: 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.3;
+    margin-bottom: 0.5rem;
 }
-.card-meta {
+.brief-meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+}
+.brief-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* ── Detailed Card (modal-like) ── */
+.detailed-card {
+    background: var(--white);
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    padding: 1.75rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 12px 32px -12px rgba(43,7,7,0.35);
+    animation: fadeUp 0.45s var(--ease-smooth) both;
+    position: relative;
+    overflow: hidden;
+}
+.detailed-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+}
+.detailed-card.type-theory::before    { background: var(--crimson-2); }
+.detailed-card.type-tutorial::before  { background: #C9842E; }
+.detailed-card.type-lab::before       { background: #2E5DC9; }
+.detailed-card.type-practical::before { background: #2E9956; }
+.detailed-card.type-extra::before     { background: #7A4FC9; }
+
+.detailed-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+.detailed-chip {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+}
+.detailed-chip.chip-theory    { background: #FCEEEE; color: var(--crimson-2); }
+.detailed-chip.chip-tutorial  { background: #FBF1E2; color: #8E5C12; }
+.detailed-chip.chip-lab       { background: #EAF0FD; color: #1C3FA8; }
+.detailed-chip.chip-practical { background: #E9F8EE; color: #1C7740; }
+.detailed-chip.chip-extra     { background: #F2ECFB; color: #5A35A8; }
+
+.detailed-close {
+    background: var(--paper-2);
+    border: none;
+    color: var(--ink-soft);
+    cursor: pointer;
+    font-size: 1.4rem;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s var(--ease-smooth);
+}
+.detailed-close:hover {
+    background: var(--line);
+    color: var(--ink);
+}
+
+.detailed-subject {
+    font-family: 'Fraunces', serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.4;
+    margin-bottom: 1.25rem;
+}
+
+.detailed-meta {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 0.85rem 1.25rem;
-    padding-top: 0.85rem; border-top: 1px dashed var(--paper-2);
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.25rem 1.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px dashed var(--paper-2);
 }
 .meta-label {
-    font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--ink-faint); margin-bottom: 0.2rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 0.35rem;
 }
-.meta-value { font-size: 0.9rem; font-weight: 600; color: var(--ink); word-break: break-word; }
+.meta-value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+    word-break: break-word;
+}
+
+.back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--crimson-2);
+    cursor: pointer;
+    margin-bottom: 1rem;
+    transition: color 0.2s var(--ease-smooth);
+}
+.back-button:hover {
+    color: var(--maroon-900);
+}
 
 .empty-box {
-    background: var(--white); border: 1.5px dashed var(--line);
-    border-radius: 16px; padding: clamp(2rem, 6vw, 3rem) 1.25rem;
-    text-align: center; margin-top: 0.5rem;
+    background: var(--white);
+    border: 1.5px dashed var(--line);
+    border-radius: 16px;
+    padding: clamp(2rem, 6vw, 3rem) 1.25rem;
+    text-align: center;
+    margin-top: 0.5rem;
 }
 .empty-title {
-    font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 600;
-    color: var(--maroon-900); margin-bottom: 0.4rem;
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--maroon-900);
+    margin-bottom: 0.4rem;
 }
-.empty-sub { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.6; max-width: 420px; margin: 0 auto; }
+.empty-sub {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    line-height: 1.6;
+    max-width: 420px;
+    margin: 0 auto;
+}
 
-.soft-divider { height: 1px; background: var(--line); margin: 2rem 0 1.25rem 0; }
-.footer { text-align: center; padding-bottom: 1rem; }
-.footer-line1 { font-size: 0.78rem; font-weight: 600; color: var(--maroon-900); }
-.footer-line2 { font-size: 0.7rem; color: var(--ink-faint); margin-top: 0.3rem; line-height: 1.5; }
+.soft-divider {
+    height: 1px;
+    background: var(--line);
+    margin: 2rem 0 1.25rem 0;
+}
+.footer {
+    text-align: center;
+    padding-bottom: 1rem;
+}
+.footer-line1 {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--maroon-900);
+}
+.footer-line2 {
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+    margin-top: 0.3rem;
+    line-height: 1.5;
+}
 
 div[data-testid="stAlert"] { border-radius: 12px !important; }
 
@@ -556,23 +680,12 @@ div[data-testid="stAlert"] { border-radius: 12px !important; }
     [data-testid="stVerticalBlockBorderWrapper"]:has(.panel-head) {
         padding: 1.15rem 1rem 1rem 1rem !important;
     }
-    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stSelectbox"]) {
-        flex-direction: column !important;
-        gap: 0.15rem !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stSelectbox"]) > div[data-testid="column"] {
-        width: 100% !important;
-        flex: 1 1 100% !important;
-        min-width: 100% !important;
-    }
-    .selection-track { gap: 0.35rem; }
-    .sel-arrow { display: none; }
-    .sel-chip { font-size: 0.74rem; }
 }
 
 @media (max-width: 480px) {
     .hero-brand { flex-direction: column; align-items: flex-start; }
     .panel-head { flex-direction: column; align-items: flex-start; }
+    .brief-meta { flex-direction: column; gap: 0.5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -590,16 +703,13 @@ st.components.v1.html("""
   try {
     var doc = window.parent.document;
   } catch (e) {
-    return; // cross-origin iframe — nothing below is safe to run
+    return;
   }
-  const PLACEHOLDERS = ["Select professor", "Select day", "Select time"];
+  const PLACEHOLDERS = ["Select professor"];
   const INK = "#1A1110";
   const INK_SOFT = "#5A4642";
   let patchTimer = 0;
 
-  // This only patches text color for legibility — it never touches
-  // position/transform, so the popover's own native placement (which
-  // anchors it correctly under the field) is always left alone.
   function patchSelectText() {
     doc.querySelectorAll('[data-testid="stSelectbox"] [data-baseweb="select"]').forEach(function (el) {
       const text = (el.textContent || "").trim();
@@ -643,9 +753,9 @@ st.components.v1.html("""
 """, height=0)
 
 
-# ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════
 # HERO
-# ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════
 n_profs = len(all_professors)
 n_records = len(df)
 n_divisions = df["division"].nunique() if DATA_OK else 0
@@ -658,7 +768,7 @@ st.markdown(f"""
       <div>
         <div class="hero-eyebrow">Marathwada Mitra Mandal's College of Engineering, Pune</div>
         <div class="hero-title">MMCOE <em>Teacher</em> Assistant</div>
-        <div class="hero-sub">Find your lecture instantly — select your name, day, and time slot from the live timetable.</div>
+        <div class="hero-sub">Select your name to view your weekly timetable at a glance.</div>
       </div>
     </div>
     <div class="hero-stats">
@@ -671,9 +781,9 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
-# ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════
 # DATA-MISSING GUARD
-# ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════
 if not DATA_OK:
     st.markdown("""
     <div class="status-banner">
@@ -683,43 +793,30 @@ if not DATA_OK:
     st.stop()
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# SESSION STATE — safe defaults
-# ════════════════════════════════════════════════════════════════════════════
-for key, default in (
-    ("prof_select", PLACEHOLDER_PROF),
-    ("day_select", PLACEHOLDER_DAY),
-    ("time_select", PLACEHOLDER_TIME),
-):
-    if key not in st.session_state:
-        st.session_state[key] = default
+# ════════════════════════════════════════════════════════════════
+# SESSION STATE
+# ════════════════════════════════════════════════════════════════
+if "prof_select" not in st.session_state:
+    st.session_state["prof_select"] = PLACEHOLDER_PROF
+if "selected_session_index" not in st.session_state:
+    st.session_state["selected_session_index"] = None
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# SEARCH PANEL — cascading options derived from CSV per selection step
-# ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════
+# PROFESSOR SELECTION PANEL
+# ════════════════════════════════════════════════════════════════
 prof_options = [PLACEHOLDER_PROF] + all_professors
-_ensure_option("prof_select", prof_options, PLACEHOLDER_PROF)
 selected_prof = st.session_state["prof_select"]
-
-day_options = [PLACEHOLDER_DAY] + _days_for_professor(selected_prof)
-_ensure_option("day_select", day_options, PLACEHOLDER_DAY)
-selected_day = st.session_state["day_select"]
-
-time_options = [PLACEHOLDER_TIME] + _times_for_professor_day(selected_prof, selected_day)
-_ensure_option("time_select", time_options, PLACEHOLDER_TIME)
-selected_time = st.session_state["time_select"]
 
 with st.container(border=True):
     st.markdown("""
     <div class="panel-head">
-      <div class="panel-title">Find a lecture</div>
-      <div class="panel-kicker">Faculty → Day → Time</div>
+      <div class="panel-title">Select Faculty</div>
     </div>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3, col4 = st.columns([2.2, 1.4, 2.2, 1.2], gap="small")
-
+    col1, _ = st.columns([2, 3], gap="small")
+    
     with col1:
         prof_filled = " filled" if selected_prof != PLACEHOLDER_PROF else ""
         st.markdown(f'<div class="field-label{prof_filled}">Faculty name</div>', unsafe_allow_html=True)
@@ -728,169 +825,150 @@ with st.container(border=True):
             options=prof_options,
             label_visibility="collapsed",
             key="prof_select",
-            on_change=_on_professor_change,
         )
 
-    with col2:
-        day_muted = "" if selected_prof != PLACEHOLDER_PROF else " muted"
-        day_filled = " filled" if selected_day != PLACEHOLDER_DAY else ""
-        st.markdown(f'<div class="field-label{day_muted}{day_filled}">Day</div>', unsafe_allow_html=True)
-        selected_day = st.selectbox(
-            "Day",
-            options=day_options,
-            label_visibility="collapsed",
-            key="day_select",
-            on_change=_on_day_change,
-            disabled=selected_prof == PLACEHOLDER_PROF,
-        )
 
-    with col3:
-        time_muted = "" if selected_day != PLACEHOLDER_DAY else " muted"
-        time_filled = " filled" if selected_time != PLACEHOLDER_TIME else ""
-        st.markdown(f'<div class="field-label{time_muted}{time_filled}">Time slot</div>', unsafe_allow_html=True)
-        selected_time = st.selectbox(
-            "Time slot",
-            options=time_options,
-            label_visibility="collapsed",
-            key="time_select",
-            disabled=selected_day == PLACEHOLDER_DAY,
-        )
-        if selected_prof != PLACEHOLDER_PROF and selected_day != PLACEHOLDER_DAY:
-            n_slots = len(time_options) - 1
-            st.markdown(
-                f'<div class="field-hint">{n_slots} slot{"s" if n_slots != 1 else ""} for this day</div>',
-                unsafe_allow_html=True,
-            )
+# ════════════════════════════════════════════════════════════════
+# TIMETABLE VIEW
+# ════════════════════════════════════════════════════════════════
 
-    with col4:
-        st.markdown('<div class="field-label">&nbsp;</div>', unsafe_allow_html=True)
-        search_clicked = st.button("Search", use_container_width=True, type="primary")
-
-    prof_active = selected_prof != PLACEHOLDER_PROF
-    day_active = selected_day != PLACEHOLDER_DAY
-    time_active = selected_time != PLACEHOLDER_TIME
-
-    prof_disp = escape_html(selected_prof) if prof_active else "—"
-    day_disp = escape_html(selected_day) if day_active else "—"
-    time_disp = escape_html(selected_time) if time_active else "—"
-
-    st.markdown(f"""
-    <div class="selection-track">
-      <span class="sel-chip {'active' if prof_active else ''}">
-        <span>👤</span>
-        <span class="sel-lab">Faculty</span>
-        <span class="sel-val">{prof_disp}</span>
-      </span>
-      <span class="sel-arrow">→</span>
-      <span class="sel-chip {'active' if day_active else ''}">
-        <span>📅</span>
-        <span class="sel-lab">Day</span>
-        <span class="sel-val">{day_disp}</span>
-      </span>
-      <span class="sel-arrow">→</span>
-      <span class="sel-chip {'active' if time_active else ''}">
-        <span>🕐</span>
-        <span class="sel-lab">Time</span>
-        <span class="sel-val">{time_disp}</span>
-      </span>
+if selected_prof == PLACEHOLDER_PROF:
+    st.markdown("""
+    <div class="empty-box">
+      <div class="empty-title">Welcome to your Timetable</div>
+      <div class="empty-sub">
+        Select your name from above to view your complete weekly schedule.
+      </div>
     </div>
     """, unsafe_allow_html=True)
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# RESULTS
-# ════════════════════════════════════════════════════════════════════════════
-TYPE_CHIP_MAP = {
-    "theory":    ("chip-theory",    "type-theory",    "Theory"),
-    "tutorial":  ("chip-tutorial",  "type-tutorial",  "Tutorial"),
-    "lab":       ("chip-lab",       "type-lab",       "Lab"),
-    "practical": ("chip-practical", "type-practical", "Practical"),
-}
-
-
-def classify(ltype: str):
-    t = (ltype or "").lower()
-    if "theory" in t:
-        return TYPE_CHIP_MAP["theory"]
-    if "tutorial" in t:
-        return TYPE_CHIP_MAP["tutorial"]
-    if "lab" in t:
-        return TYPE_CHIP_MAP["lab"]
-    if "practical" in t:
-        return TYPE_CHIP_MAP["practical"]
-    return ("chip-extra", "type-extra", ltype.title() if ltype else "Session")
-
-
-if search_clicked:
-    if not (prof_active and day_active and time_active):
-        st.warning("Please select faculty, day, and time slot before searching.")
-    else:
-        results = df[
-            (df["professor"] == selected_prof)
-            & (df["day"] == selected_day)
-            & (df["time_slot"] == selected_time)
-        ].copy()
-
-        if results.empty:
+else:
+    # Get professor's schedule
+    schedule = _get_professor_schedule(selected_prof)
+    
+    # Display professor info header
+    st.markdown(f"""
+    <div style="margin: 1.5rem 0; padding: 1rem; background: #FFFBFB; border-left: 4px solid var(--crimson-2); border-radius: 8px;">
+      <div style="font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 600; color: var(--maroon-900);">
+        📅 Weekly Timetable for <span style="color: var(--crimson-2);">{escape_html(selected_prof)}</span>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Handle detailed view
+    if st.session_state["selected_session_index"] is not None:
+        session_key = st.session_state["selected_session_index"]
+        
+        # Parse the key to get day and index
+        day, idx = session_key.split("_")
+        idx = int(idx)
+        
+        if day in schedule and idx < len(schedule[day]):
+            session = schedule[day][idx]
+            
+            # Back button
+            if st.button("← Back to Schedule"):
+                st.session_state["selected_session_index"] = None
+                st.rerun()
+            
+            # Detailed card
+            chip_cls, card_cls, chip_label = classify(session["type"])
             st.markdown(f"""
-            <div class="empty-box">
-              <div class="empty-title">No scheduled session</div>
-              <div class="empty-sub">
-                <b>{escape_html(selected_prof)}</b> has no class on
-                <b>{escape_html(selected_day)}</b> at <b>{escape_html(selected_time)}</b>.
-                This may be a free period.
+            <div class="detailed-card {card_cls}">
+              <div class="detailed-top">
+                <span class="detailed-chip {chip_cls}">{chip_label}</span>
+              </div>
+              <div class="detailed-subject">{escape_html(session['subject'])}</div>
+              <div class="detailed-meta">
+                <div>
+                  <div class="meta-label">Faculty</div>
+                  <div class="meta-value">{escape_html(session['professor'])}</div>
+                </div>
+                <div>
+                  <div class="meta-label">Room</div>
+                  <div class="meta-value">{escape_html(session['room'])}</div>
+                </div>
+                <div>
+                  <div class="meta-label">Division</div>
+                  <div class="meta-value">{escape_html(session['division'])}</div>
+                </div>
+                <div>
+                  <div class="meta-label">Day</div>
+                  <div class="meta-value">{escape_html(session['day'])}</div>
+                </div>
+                <div>
+                  <div class="meta-label">Time</div>
+                  <div class="meta-value">{escape_html(session['time_slot'])}</div>
+                </div>
+                <div>
+                  <div class="meta-label">Type</div>
+                  <div class="meta-value">{chip_label}</div>
+                </div>
               </div>
             </div>
             """, unsafe_allow_html=True)
-        else:
-            n = len(results)
+    else:
+        # Display all days
+        day_emojis = {
+            "Monday": "🌅",
+            "Tuesday": "☀️",
+            "Wednesday": "🌤️",
+            "Thursday": "⛅",
+            "Friday": "🌆"
+        }
+        
+        for day in DAY_ORDER:
+            sessions = schedule[day]
+            emoji = day_emojis.get(day, "📅")
+            
             st.markdown(f"""
-            <div class="results-bar">
-              <div class="results-title">Schedule for <span class="who">{escape_html(selected_prof)}</span></div>
-              <div class="results-pill">{n} session{"s" if n != 1 else ""}</div>
-            </div>
+            <div class="day-section">
+              <div class="day-header">
+                <span class="day-emoji">{emoji}</span>
+                <span class="day-title">{day}</span>
+                <span class="day-count">{len(sessions)} session{"s" if len(sessions) != 1 else ""}</span>
+              </div>
             """, unsafe_allow_html=True)
-
-            total = len(results)
-            for idx, (_, row) in enumerate(results.iterrows(), start=1):
-                chip_cls, card_cls, chip_label = classify(row["type"])
-                index_tag = f"{idx:02d} / {total:02d}" if total > 1 else ""
+            
+            if not sessions:
                 st.markdown(f"""
-                <div class="card {card_cls}">
-                  <div class="card-top">
-                    <span class="chip {chip_cls}">{chip_label}</span>
-                    <span class="card-index">{index_tag}</span>
-                  </div>
-                  <div class="card-subject">{escape_html(row['subject'])}</div>
-                  <div class="card-meta">
-                    <div>
-                      <div class="meta-label">Room</div>
-                      <div class="meta-value">{escape_html(row['room'])}</div>
-                    </div>
-                    <div>
-                      <div class="meta-label">Division</div>
-                      <div class="meta-value">{escape_html(row['division'])}</div>
-                    </div>
-                    <div>
-                      <div class="meta-label">Day</div>
-                      <div class="meta-value">{escape_html(row['day'])}</div>
-                    </div>
-                    <div>
-                      <div class="meta-label">Time</div>
-                      <div class="meta-value">{escape_html(row['time_slot'])}</div>
-                    </div>
-                  </div>
+                <div class="no-schedule">
+                  No schedule on {day}
                 </div>
                 """, unsafe_allow_html=True)
+            else:
+                for idx, session in enumerate(sessions):
+                    chip_cls, card_cls, chip_label = classify(session["type"])
+                    session_key = f"{day}_{idx}"
+                    
+                    st.markdown(f"""
+                    <div class="brief-card {card_cls}" onclick="window.parent.document.querySelector('[data-session-key=\"{session_key}\"]')?.click()">
+                      <div class="brief-top">
+                        <span class="brief-chip {chip_cls}">{chip_label}</span>
+                      </div>
+                      <div class="brief-subject">{escape_html(session['subject'])}</div>
+                      <div class="brief-meta">
+                        <div class="brief-meta-item">🕐 {escape_html(session['time_slot'])}</div>
+                        <div class="brief-meta-item">📍 {escape_html(session['room'])}</div>
+                        <div class="brief-meta-item">👥 {escape_html(session['division'])}</div>
+                      </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Hidden button to trigger session selection
+                    if st.button("View Details", key=f"btn_{session_key}", help="Click to see full details"):
+                        st.session_state["selected_session_index"] = session_key
+                        st.rerun()
+            
+            st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ════════════════════════════════════════════════════════════════════════════=
+# ════════════════════════════════════════════════════════════════
 # FOOTER
-# ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════
 st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 st.markdown("""
 <div class="footer">
-  <div class="footer-line1">MMCOE Teacher Assistant — Engineering Science &amp; Humanities</div>
+  <div class="footer-line1">MMCOE Teacher Assistant — Engineering Science & Humanities</div>
   <div class="footer-line2">Marathwada Mitra Mandal's College of Engineering, Pune · A.Y. 2025–26</div>
 </div>
 """, unsafe_allow_html=True)
